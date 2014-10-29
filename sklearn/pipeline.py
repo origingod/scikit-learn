@@ -130,6 +130,31 @@ class Pipeline(BaseEstimator):
         self.steps[-1][-1].fit(Xt, y, **fit_params)
         return self
 
+    def partial_fit(self,X,call_from_final=False,**fit_params):
+        """
+        partial fit X, required all transformer got partial_fit function
+        """
+        fit_params_steps = dict((step, {}) for step, _ in self.steps)
+        for pname, pval in six.iteritems(fit_params):
+            step, param = pname.split('__', 1)
+            fit_params_steps[step][param] = pval
+        Xt = X
+        for name, transform in self.steps[:-1]:
+            if hasattr(transform, 'partial_fit'):
+                transform.partial_fit(Xt,**fit_params_steps[name])
+                Xt = transform.transform(Xt)
+            else:
+                raise Exception("no partial_fit function!")
+        if call_from_final == True:
+            return Xt, fit_params_steps[self.steps[-1][0]]
+        else:
+            return self
+
+    def final_partial_fit(self,X,y=None,**fit_params):
+        Xt, fit_params = self.partial_fit(X, True, **fit_params)
+        self.steps[-1][-1].fit(Xt, y, **fit_params)
+        return self
+
     def fit_transform(self, X, y=None, **fit_params):
         """Fit all the transforms one after the other and transform the
         data, then use fit_transform on transformed data using the final
